@@ -4,11 +4,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Validate Upstox environment variables
-const requiredEnvVars = ['UPSTOX_API_KEY', 'UPSTOX_API_SECRET', 'UPSTOX_REDIRECT_URI'];
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
+// Upstox credentials are only needed when the live market-data stream is enabled.
+// Keeping them optional allows deployments to run safely with USE_MOCK_DATA=true.
+if (process.env.USE_MOCK_DATA !== 'true') {
+    const requiredEnvVars = ['UPSTOX_API_KEY', 'UPSTOX_API_SECRET', 'UPSTOX_REDIRECT_URI'];
+    for (const envVar of requiredEnvVars) {
+        if (!process.env[envVar]) {
+            throw new Error(`Missing required environment variable: ${envVar}`);
+        }
     }
 }
 
