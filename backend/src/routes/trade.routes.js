@@ -157,4 +157,22 @@ router.delete('/orders/:orderId', authenticateUser, async (req, res) => {
     }
 });
 
+/**
+ * PUT /api/trade/orders/:orderId/metadata
+ * Update order metadata (strategy and notes) for journaling
+ */
+router.put('/orders/:orderId/metadata', authenticateUser, async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { strategy, notes } = req.body;
+        const tradingEngine = req.app.locals.tradingEngine;
+
+        const result = await tradingEngine.updateOrderMetadata(req.userId, orderId, { strategy, notes });
+        res.json(result);
+    } catch (error) {
+        console.error('Order metadata update error:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
 export default router;

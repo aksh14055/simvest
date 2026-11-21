@@ -15,6 +15,7 @@ interface PortfolioState {
     fetchLivePrices: () => Promise<void>;
     executeTrade: (symbol: string, instrumentKey: string, type: 'BUY' | 'SELL', quantity: number, orderType?: 'MARKET' | 'LIMIT', limitPrice?: number, strategy?: string, notes?: string) => Promise<any>;
     cancelOrder: (orderId: string) => Promise<void>;
+    updateOrderMetadata: (orderId: string, strategy: string, notes: string) => Promise<void>;
     updatePortfolioWithPrices: (prices: Map<string, number>) => void;
 }
 
@@ -132,6 +133,22 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
             set({ isOrdersLoading: false });
         } catch (error: any) {
             set({ error: error.message || 'Failed to cancel order', isOrdersLoading: false });
+            throw error;
+        }
+    },
+
+    updateOrderMetadata: async (orderId: string, strategy: string, notes: string) => {
+        try {
+            set({ isOrdersLoading: true, error: null });
+            await apiService.updateOrderMetadata(orderId, strategy, notes);
+            set((state) => ({
+                orders: state.orders.map((o) =>
+                    o.id === orderId ? { ...o, strategy, notes } : o
+                ),
+                isOrdersLoading: false,
+            }));
+        } catch (error: any) {
+            set({ error: error.message || 'Failed to update order notes', isOrdersLoading: false });
             throw error;
         }
     },

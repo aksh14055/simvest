@@ -40,9 +40,9 @@ export const TradeInputForm = ({
     onCancel
 }: TradeInputFormProps) => {
     return (
-        <div className="space-y-4">
+        <div className="space-y-2.5">
             {/* Header / Trade Type Toggle */}
-            <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg mb-4">
+            <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg mb-1">
                 <button
                     onClick={() => onSideChange('BUY')}
                     className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wide rounded-md transition-all ${side === 'BUY'
@@ -64,10 +64,10 @@ export const TradeInputForm = ({
             </div>
 
             {/* Main Inputs Grid */}
-            <div className="grid grid-cols-2 gap-3 mb-2">
+            <div className="grid grid-cols-2 gap-2">
                 {/* Quantity */}
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1.5 block">Quantity</label>
+                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Quantity</label>
                     <div className="relative">
                         <input
                             type="number"
@@ -83,7 +83,7 @@ export const TradeInputForm = ({
 
                 {/* Price */}
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1.5 block">Price</label>
+                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Price</label>
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-sans">₹</span>
                         <input
@@ -100,9 +100,9 @@ export const TradeInputForm = ({
             </div>
 
             {/* Trade Journaling */}
-            <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-slate-800">
+            <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-slate-800">
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1.5 block flex justify-between">
+                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block flex justify-between">
                         <span>Strategy Tag</span>
                     </label>
                     <select
@@ -122,7 +122,7 @@ export const TradeInputForm = ({
                     </select>
                 </div>
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1.5 block">Trade Notes (The "Why")</label>
+                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Trade Notes (The "Why")</label>
                     <textarea
                         rows={2}
                         value={notes}
@@ -134,7 +134,7 @@ export const TradeInputForm = ({
             </div>
 
             {/* Total Summary */}
-            <div className="pt-3 border-t border-border mt-2 space-y-1">
+            <div className="pt-2 border-t border-border mt-1.5 space-y-0.5">
                 <div className="flex justify-between items-center text-xs">
                     <span className="text-text-muted">Margin Req.</span>
                     <span className="font-mono font-medium text-text-primary">₹{total}</span>
@@ -149,7 +149,7 @@ export const TradeInputForm = ({
             <button
                 onClick={onSubmit}
                 disabled={isTrading}
-                className={`w-full py-2.5 text-sm font-bold uppercase tracking-wider rounded-md transition-all transform active:scale-[0.98] ${side === 'BUY'
+                className={`w-full py-2 text-sm font-bold uppercase tracking-wider rounded-md transition-all transform active:scale-[0.98] ${side === 'BUY'
                     ? 'bg-success hover:bg-success-dark text-white shadow-sm hover:shadow'
                     : 'bg-danger hover:bg-danger-dark text-white shadow-sm hover:shadow'
                     } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}

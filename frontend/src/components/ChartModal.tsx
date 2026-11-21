@@ -1,14 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { StockChart } from './StockChart';
 import { TradeAnalysis, DeepAnalysisData } from './TradeAnalysis';
+import { TradeForm } from './TradeForm';
 import { apiService } from '../services/api';
 import { generateHistoricalData, Timeframe } from '../services/historicalData';
 import {
     calculateSMA,
     calculateEMA,
-    IndicatorData
+    calculateRSI,
+    calculateMACD,
+    calculateBollingerBands
 } from '../services/technicalIndicators';
+
+
 
 import { Stock } from '../types';
 import { colors } from '../styles/colors';
@@ -22,11 +26,12 @@ interface ChartModalProps {
 }
 
 export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
-    const navigate = useNavigate();
     const [timeframe, setTimeframe] = useState<Timeframe>('1M');
     const [chartType, setChartType] = useState<'candlestick' | 'line' | 'area' | 'bar' | 'baseline' | 'renko' | 'pointAndFigure'>('candlestick');
     const [isChartTypeOpen, setIsChartTypeOpen] = useState(false);
     const chartTypeRef = useRef<HTMLDivElement>(null);
+    const [sidebarTab, setSidebarTab] = useState<'verdict' | 'trade'>('verdict');
+    const [tradeSide, setTradeSide] = useState<'BUY' | 'SELL'>('BUY');
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -44,13 +49,7 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
     }>({ ohlc: [], volume: [] });
 
     const [activeIndicators, setActiveIndicators] = useState<string[]>([]);
-    const [indicators, setIndicators] = useState<{
-        sma20?: IndicatorData[];
-        sma50?: IndicatorData[];
-        sma200?: IndicatorData[];
-        ema12?: IndicatorData[];
-        ema26?: IndicatorData[];
-    }>({});
+    const [indicators, setIndicators] = useState<Record<string, any>>({});
 
     const [analysisData, setAnalysisData] = useState<DeepAnalysisData | null>(null);
     const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(true);
@@ -203,24 +202,18 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
     useEffect(() => {
         if (chartData.ohlc.length === 0) return;
 
-        const newIndicators: typeof indicators = {};
+        const newIndicators: Record<string, any> = {};
 
-        if (activeIndicators.includes('SMA20')) {
-            newIndicators.sma20 = calculateSMA(chartData.ohlc, 20);
-        }
-        if (activeIndicators.includes('SMA50')) {
-            newIndicators.sma50 = calculateSMA(chartData.ohlc, 50);
-        }
-        if (activeIndicators.includes('SMA200')) {
-            newIndicators.sma200 = calculateSMA(chartData.ohlc, 200);
-        }
-        if (activeIndicators.includes('EMA12')) {
-            newIndicators.ema12 = calculateEMA(chartData.ohlc, 12);
-        }
-        if (activeIndicators.includes('EMA26')) {
-            newIndicators.ema26 = calculateEMA(chartData.ohlc, 26);
-        }
+        if (activeIndicators.includes('SMA20')) newIndicators.sma20 = calculateSMA(chartData.ohlc, 20);
+        if (activeIndicators.includes('SMA50')) newIndicators.sma50 = calculateSMA(chartData.ohlc, 50);
+        if (activeIndicators.includes('SMA200')) newIndicators.sma200 = calculateSMA(chartData.ohlc, 200);
+        if (activeIndicators.includes('EMA12')) newIndicators.ema12 = calculateEMA(chartData.ohlc, 12);
+        if (activeIndicators.includes('EMA26')) newIndicators.ema26 = calculateEMA(chartData.ohlc, 26);
 
+        // Advanced indicators
+        if (activeIndicators.includes('BB')) newIndicators.bollinger = calculateBollingerBands(chartData.ohlc, 20, 2);
+        if (activeIndicators.includes('RSI')) newIndicators.rsi = calculateRSI(chartData.ohlc, 14);
+        if (activeIndicators.includes('MACD')) newIndicators.macd = calculateMACD(chartData.ohlc);
 
         setIndicators(newIndicators);
     }, [chartData, activeIndicators]);
@@ -258,9 +251,9 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
         );
     };
 
-    const handleTradeRedirect = (side: 'BUY' | 'SELL') => {
-        navigate(`/practice?symbol=${stock.symbol}&side=${side}`);
-        onClose();
+    const handleTradeClick = (side: 'BUY' | 'SELL') => {
+        setTradeSide(side);
+        setSidebarTab('trade');
     };
 
     const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlistStore();
@@ -275,76 +268,76 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[85vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[32px] shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden transition-all duration-300">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-border">
+                <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md">
                     <div className="flex items-center gap-6">
                         <div>
                             <div className="flex items-center gap-3">
-                                <h2 className="text-xl font-semibold text-text-primary">{stock.symbol}</h2>
+                                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{stock.symbol}</h2>
                                 <button
                                     onClick={handleToggleWatchlist}
-                                    className={`p-1.5 rounded-full transition ${inWatchlist ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'}`}
+                                    className={`p-1.5 rounded-xl transition-all duration-200 ${inWatchlist ? 'text-yellow-500 bg-yellow-500/10' : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                                     title={inWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
                                 >
-                                    <Star className={`w-5 h-5 ${inWatchlist ? 'fill-current' : ''}`} />
+                                    <Star className={`w-4.5 h-4.5 ${inWatchlist ? 'fill-current' : ''}`} />
                                 </button>
                             </div>
                             <div className="flex items-center space-x-2 mt-1">
-                                <span className="text-2xl font-bold text-text-primary">
+                                <span className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                                     ₹{stock.ltp?.toFixed(2) || '0.00'}
                                 </span>
                                 {formatChange()}
                             </div>
-                            <span className="text-[10px] text-text-secondary mt-1 block">
+                            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
                                 Last Updated: {stock.lastUpdated ? new Date(stock.lastUpdated).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' }) : 'Live'}
                             </span>
                         </div>
 
-                        <div className="h-8 w-px bg-border"></div>
+                        <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
 
                         {/* Trade Actions */}
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => handleTradeRedirect('BUY')}
-                                className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded shadow-md flex items-center gap-2 transform active:scale-95 transition-all"
+                                onClick={() => handleTradeClick('BUY')}
+                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-500/10 flex items-center gap-1.5 transform active:scale-95 transition-all group"
                             >
-                                <span>B</span> Buy
+                                <span className="opacity-80 font-normal">B</span> Buy
                             </button>
                             <button
-                                onClick={() => handleTradeRedirect('SELL')}
-                                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded shadow-md flex items-center gap-2 transform active:scale-95 transition-all"
+                                onClick={() => handleTradeClick('SELL')}
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl shadow-lg shadow-red-500/10 flex items-center gap-1.5 transform active:scale-95 transition-all group"
                             >
-                                <span>S</span> Sell
+                                <span className="opacity-80 font-normal">S</span> Sell
                             </button>
                         </div>
                     </div>
 
                     <button
                         onClick={onClose}
-                        className="text-text-secondary hover:text-text-primary transition p-2"
+                        className="text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition p-2 rounded-xl"
                         title="Close (Esc)"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
                 {/* Controls */}
-                <div className="p-4 border-b border-border bg-background space-y-3">
+                <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10 flex items-center justify-between gap-4 flex-wrap">
                     {/* Timeframe & Chart Type */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
                         {/* Timeframe Selector */}
-                        <div className="flex space-x-1">
+                        <div className="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
                             {timeframes.map((tf) => (
                                 <button
                                     key={tf}
                                     onClick={() => setTimeframe(tf)}
-                                    className={`px-3 py-1.5 text-sm font-medium rounded transition ${timeframe === tf
-                                        ? 'bg-primary text-white'
-                                        : 'text-text-secondary hover:bg-surface-hover'
+                                    className={`px-3 py-1.5 text-xs font-extrabold rounded-lg transition-all duration-150 ${timeframe === tf
+                                        ? 'bg-white dark:bg-slate-700 text-primary shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                                         }`}
                                 >
                                     {tf}
@@ -352,14 +345,16 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
                             ))}
                         </div>
 
+                        <div className="h-5 w-px bg-slate-200 dark:bg-slate-700/50"></div>
+
                         {/* Chart Style Selector Dropdown */}
                         <div className="relative" ref={chartTypeRef}>
                             <button
                                 onClick={() => setIsChartTypeOpen(!isChartTypeOpen)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all duration-200 ${
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-all duration-200 ${
                                     isChartTypeOpen
                                         ? 'bg-primary/10 text-primary border-primary/30'
-                                        : 'bg-white dark:bg-slate-800 text-text-secondary border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:border-gray-300 dark:hover:border-slate-600'
+                                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm'
                                 }`}
                                 title="Select Chart Style"
                             >
@@ -370,13 +365,13 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
                                     {chartType === 'area' && <AreaChart size={13} />}
                                     {chartType === 'baseline' && <TrendingUp size={13} />}
                                 </span>
-                                <span className="capitalize text-[11px] font-bold">
+                                <span className="capitalize text-[10px] font-bold">
                                     {chartType === 'candlestick' ? 'Candles' : chartType === 'bar' ? 'Bars' : chartType === 'pointAndFigure' ? 'Point & Figure' : chartType}
                                 </span>
                                 <ChevronDown size={10} className={`opacity-60 transition-transform duration-200 ${isChartTypeOpen ? 'rotate-180' : ''}`} />
                             </button>
                             {isChartTypeOpen && (
-                                <div className="absolute right-0 mt-2 w-44 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+                                <div className="absolute right-0 mt-2 w-44 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 py-1 overflow-hidden">
                                     {[
                                         { id: 'candlestick', label: 'Candlestick', icon: <CandlestickChart size={12} /> },
                                         { id: 'bar', label: 'OHLC Bars', icon: <BarChart3 size={12} /> },
@@ -395,10 +390,10 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
                                             className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
                                                 chartType === style.id
                                                     ? 'bg-primary/10 text-primary font-bold'
-                                                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                                                    : 'text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50'
                                             }`}
                                         >
-                                            <span className={chartType === style.id ? 'text-primary flex items-center' : 'text-gray-400 dark:text-gray-500 flex items-center'}>
+                                            <span className={chartType === style.id ? 'text-primary flex items-center' : 'text-slate-400 dark:text-slate-500 flex items-center'}>
                                                 {style.icon}
                                             </span>
                                             <span>{style.label}</span>
@@ -418,10 +413,10 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
                     </div>
                 </div>
 
-                {/* Main Content: Chart + Analysis */}
+                {/* Main Content: Chart + Analysis/Trade */}
                 <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
                     {/* Chart Area */}
-                    <div className="flex-1 p-4 min-h-[400px] md:min-h-0 relative">
+                    <div className="flex-1 min-h-[400px] md:min-h-0 relative">
                         {chartData.ohlc.length > 0 ? (
                             <StockChart
                                 ohlcData={chartData.ohlc}
@@ -439,21 +434,59 @@ export const ChartModal = ({ stock, onClose }: ChartModalProps) => {
                         )}
                     </div>
 
-                    {/* Analysis Sidebar */}
-                    <div className="w-full md:w-[350px] border-l border-border bg-gray-50 dark:bg-slate-800/50 p-4 overflow-y-auto custom-scrollbar">
-                        <div className="mb-4">
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-1">
-                                <span>🤖</span> Market Verdict
-                            </h3>
-                            <p className="text-xs text-text-secondary">
-                                Real-time technical analysis based on 6-month trend data.
-                            </p>
+                    {/* Analysis & Trade Sidebar */}
+                    <div className="w-full md:w-[390px] border-l border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/10 flex flex-col h-full overflow-hidden">
+                        {/* Tab Headers */}
+                        <div className="px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 flex bg-white/40 dark:bg-slate-900/20 backdrop-blur-sm flex-none">
+                            <div className="w-full bg-slate-100 dark:bg-slate-900/60 p-0.5 rounded-xl flex gap-0.5 border border-slate-200/30 dark:border-slate-700/30">
+                                <button
+                                    onClick={() => setSidebarTab('verdict')}
+                                    className={`flex-1 py-1.8 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                                        sidebarTab === 'verdict'
+                                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm font-bold border-0'
+                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold'
+                                    }`}
+                                >
+                                    <span>🤖</span> AI Verdict
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setSidebarTab('trade');
+                                        setTradeSide('BUY');
+                                    }}
+                                    className={`flex-1 py-1.8 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                                        sidebarTab === 'trade'
+                                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm font-bold border-0'
+                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold'
+                                    }`}
+                                >
+                                    <span>⚡</span> Trade
+                                </button>
+                            </div>
                         </div>
-                        <TradeAnalysis
-                            analysis={analysisData}
-                            isLoading={isLoadingAnalysis}
-                            minimal={true}
-                        />
+
+                        {/* Tab Content */}
+                        <div className="flex-1 px-5 pt-2 pb-3 overflow-y-auto custom-scrollbar">
+                            {sidebarTab === 'verdict' ? (
+                                <div className="space-y-3">
+                                    <TradeAnalysis
+                                        analysis={analysisData}
+                                        isLoading={isLoadingAnalysis}
+                                        minimal={true}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="bg-white dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl px-4 py-2.5 shadow-sm">
+                                        <TradeForm
+                                            stock={stock}
+                                            initialSide={tradeSide}
+                                            onSuccess={() => {}}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

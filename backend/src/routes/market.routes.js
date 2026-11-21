@@ -10,7 +10,97 @@ const router = express.Router();
  * GET /api/market/instruments
  * Get NIFTY 50 instrument list
  */
-const SECTOR_CACHE = {};
+const SECTOR_MAP = {
+    // --- IT ---
+    'TCS':          'IT',
+    'INFY':         'IT',
+    'WIPRO':        'IT',
+    'HCLTECH':      'IT',
+    'TECHM':        'IT',
+
+    // --- Banking ---
+    'HDFCBANK':     'Banking',
+    'ICICIBANK':    'Banking',
+    'SBIN':         'Banking',
+    'KOTAKBANK':    'Banking',
+    'AXISBANK':     'Banking',
+
+    // --- Financial Services ---
+    'BAJFINANCE':   'Financial Services',
+    'BAJAJFINSV':   'Financial Services',
+    'SHRIRAMFIN':   'Financial Services',
+    'JIOFIN':       'Financial Services',
+
+    // --- Insurance ---
+    'HDFCLIFE':     'Insurance',
+    'SBILIFE':      'Insurance',
+
+    // --- FMCG ---
+    'ITC':          'FMCG',
+    'HINDUNILVR':   'FMCG',
+    'NESTLEIND':    'FMCG',
+    'TATACONSUM':   'FMCG',
+
+    // --- Automobile ---
+    'MARUTI':       'Automobile',
+    'M&M':          'Automobile',
+    'BAJAJ-AUTO':   'Automobile',
+    'EICHERMOT':    'Automobile',
+    'TMPV':         'Automobile',
+
+    // --- Pharma ---
+    'SUNPHARMA':    'Pharma',
+    'DRREDDY':      'Pharma',
+    'CIPLA':        'Pharma',
+
+    // --- Healthcare ---
+    'APOLLOHOSP':   'Healthcare',
+    'MAXHEALTH':    'Healthcare',
+
+    // --- Energy ---
+    'RELIANCE':     'Energy',
+    'ONGC':         'Energy',
+    'COALINDIA':    'Energy',
+
+    // --- Telecom ---
+    'BHARTIARTL':   'Telecom',
+
+    // --- Infrastructure ---
+    'LT':           'Infrastructure',
+    'ADANIPORTS':   'Infrastructure',
+
+    // --- Consumer ---
+    'TITAN':        'Consumer',
+    'ASIANPAINT':   'Consumer',
+
+    // --- Retail ---
+    'TRENT':        'Retail',
+
+    // --- Materials ---
+    'ULTRACEMCO':   'Materials',
+    'TATASTEEL':    'Materials',
+    'HINDALCO':     'Materials',
+    'JSWSTEEL':     'Materials',
+    'GRASIM':       'Materials',
+
+    // --- Power ---
+    'NTPC':         'Power',
+    'POWERGRID':    'Power',
+
+    // --- Capital Goods ---
+    'BEL':          'Capital Goods',
+
+    // --- Airlines ---
+    'INDIGO':       'Airlines',
+
+    // --- Consumer Services ---
+    'ETERNAL':      'Consumer Services',
+
+    // --- Diversified ---
+    'ADANIENT':     'Diversified',
+};
+
+const SECTOR_CACHE = { ...SECTOR_MAP };
 let INSTRUMENTS_CACHE = null;
 let CACHE_TIMESTAMP = 0;
 

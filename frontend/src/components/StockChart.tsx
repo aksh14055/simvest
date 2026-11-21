@@ -18,39 +18,92 @@ import { OHLCData, VolumeData } from '../services/historicalData';
 import { IndicatorData, MACDData, BollingerBandsData, getMACDHistogramColor } from '../services/technicalIndicators';
 import { colors } from '../styles/colors';
 
+// Helper to safely parse any lightweight-charts Time format into a UNIX timestamp in seconds
+function getTimeNum(t: any): number {
+    if (typeof t === 'number') return t;
+    if (typeof t === 'string') {
+        if (!isNaN(t as any)) return parseInt(t, 10);
+        return Math.floor(Date.parse(t) / 1000) || 0;
+    }
+    if (t && typeof t === 'object' && 'year' in t) {
+        const bd = t as any;
+        return Math.floor(new Date(bd.year, bd.month - 1, bd.day).getTime() / 1000);
+    }
+    return 0;
+}
+
+// Helper to format a UNIX timestamp back to the same type as the original time property to prevent time scale mismatches
+function formatTime(timeNum: number, originalTime: any): any {
+    if (typeof originalTime === 'number') return timeNum;
+    if (typeof originalTime === 'string') {
+        if (!isNaN(originalTime as any)) return String(timeNum);
+        const date = new Date(timeNum * 1000);
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+    if (originalTime && typeof originalTime === 'object' && 'year' in originalTime) {
+        const date = new Date(timeNum * 1000);
+        return {
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            day: date.getDate()
+        };
+    }
+    return timeNum;
+}
+
 // Custom Renko algorithm to construct price bricks from standard OHLC candles
 export function calculateRenko(ohlcData: OHLCData[]): OHLCData[] {
     if (ohlcData.length === 0) return [];
     
-    // Brick size is 1% of the initial close
-    const brickSize = Math.max(0.1, (ohlcData[0]?.close || 100) * 0.01);
+    // Dynamically calculate brick size based on price range to ensure optimal brick distribution (e.g. ~45 bricks)
+    const prices = ohlcData.map(d => d.close);
+    const maxPrice = Math.max(...prices);
+    const minPrice = Math.min(...prices);
+    const priceRange = maxPrice - minPrice;
+    
+    const brickSize = priceRange > 0
+        ? Math.max(0.02, priceRange / 45)
+        : Math.max(0.02, (ohlcData[0]?.close || 100) * 0.002);
+    
+    // Calculate average time interval between candles in seconds to maintain sequential consistency
+    let timeInterval = 86400; // Default to daily
+    if (ohlcData.length > 1) {
+        const diffs = [];
+        for (let i = 1; i < Math.min(ohlcData.length, 10); i++) {
+            const t1 = getTimeNum(ohlcData[i-1].time);
+            const t2 = getTimeNum(ohlcData[i].time);
+            const diff = t2 - t1;
+            if (diff > 0) diffs.push(diff);
+        }
+        if (diffs.length > 0) {
+            timeInterval = Math.min(...diffs);
+        }
+    }
     
     const renkoBricks: OHLCData[] = [];
     let currentBrickTop = ohlcData[0].close;
     let currentBrickBottom = ohlcData[0].close - brickSize;
-    let lastTime = 0;
+    let currentBrickTimeNum = getTimeNum(ohlcData[0].time);
     
     ohlcData.forEach((candle) => {
-        const timeVal = typeof candle.time === 'number' ? candle.time : parseInt(candle.time as any, 10);
-        
         if (candle.close >= currentBrickTop + brickSize) {
             const numBricks = Math.floor((candle.close - currentBrickTop) / brickSize);
             for (let b = 0; b < numBricks; b++) {
                 const openVal = currentBrickTop;
                 const closeVal = currentBrickTop + brickSize;
-                let brickTime = timeVal;
-                if (brickTime <= lastTime) {
-                    brickTime = lastTime + 1;
-                }
-                lastTime = brickTime;
                 
                 renkoBricks.push({
-                    time: brickTime,
+                    time: formatTime(currentBrickTimeNum, ohlcData[0].time),
                     open: parseFloat(openVal.toFixed(2)),
                     high: parseFloat(closeVal.toFixed(2)),
                     low: parseFloat(openVal.toFixed(2)),
                     close: parseFloat(closeVal.toFixed(2))
                 });
+                
+                currentBrickTimeNum += timeInterval;
                 currentBrickTop = closeVal;
                 currentBrickBottom = openVal;
             }
@@ -59,19 +112,16 @@ export function calculateRenko(ohlcData: OHLCData[]): OHLCData[] {
             for (let b = 0; b < numBricks; b++) {
                 const openVal = currentBrickBottom;
                 const closeVal = currentBrickBottom - brickSize;
-                let brickTime = timeVal;
-                if (brickTime <= lastTime) {
-                    brickTime = lastTime + 1;
-                }
-                lastTime = brickTime;
                 
                 renkoBricks.push({
-                    time: brickTime,
-                    open: openVal,
-                    high: openVal,
-                    low: closeVal,
-                    close: closeVal
+                    time: formatTime(currentBrickTimeNum, ohlcData[0].time),
+                    open: parseFloat(openVal.toFixed(2)),
+                    high: parseFloat(openVal.toFixed(2)),
+                    low: parseFloat(closeVal.toFixed(2)),
+                    close: parseFloat(closeVal.toFixed(2))
                 });
+                
+                currentBrickTimeNum += timeInterval;
                 currentBrickTop = openVal;
                 currentBrickBottom = closeVal;
             }
@@ -80,7 +130,7 @@ export function calculateRenko(ohlcData: OHLCData[]): OHLCData[] {
     
     if (renkoBricks.length === 0) {
         renkoBricks.push({
-            time: typeof ohlcData[0].time === 'number' ? ohlcData[0].time : parseInt(ohlcData[0].time as any, 10),
+            time: ohlcData[0].time,
             open: ohlcData[0].open,
             high: ohlcData[0].high,
             low: ohlcData[0].low,
@@ -95,8 +145,32 @@ export function calculateRenko(ohlcData: OHLCData[]): OHLCData[] {
 export function calculatePointAndFigure(ohlcData: OHLCData[]): OHLCData[] {
     if (ohlcData.length === 0) return [];
     
-    const boxSize = Math.max(0.15, (ohlcData[0]?.close || 100) * 0.015);
+    // Dynamically calculate box size based on price range to ensure optimal P&F column and box distribution
+    const prices = ohlcData.map(d => d.close);
+    const maxPrice = Math.max(...prices);
+    const minPrice = Math.min(...prices);
+    const priceRange = maxPrice - minPrice;
+    
+    const boxSize = priceRange > 0
+        ? Math.max(0.02, priceRange / 35)
+        : Math.max(0.02, (ohlcData[0]?.close || 100) * 0.003);
+        
     const reversal = 3;
+    
+    // Calculate average time interval between candles in seconds to maintain sequential consistency
+    let timeInterval = 86400; // Default to daily
+    if (ohlcData.length > 1) {
+        const diffs = [];
+        for (let i = 1; i < Math.min(ohlcData.length, 10); i++) {
+            const t1 = getTimeNum(ohlcData[i-1].time);
+            const t2 = getTimeNum(ohlcData[i].time);
+            const diff = t2 - t1;
+            if (diff > 0) diffs.push(diff);
+        }
+        if (diffs.length > 0) {
+            timeInterval = Math.min(...diffs);
+        }
+    }
     
     const columns: Array<{ isUp: boolean; boxes: number[] }> = [];
     let currentIsUp = ohlcData[0].close >= ohlcData[0].open;
@@ -138,7 +212,7 @@ export function calculatePointAndFigure(ohlcData: OHLCData[]): OHLCData[] {
     }
     
     const pfCandles: OHLCData[] = [];
-    const baseTime = typeof ohlcData[0].time === 'number' ? ohlcData[0].time : parseInt(ohlcData[0].time as any, 10);
+    const baseTimeNum = getTimeNum(ohlcData[0].time);
     
     columns.forEach((col, idx) => {
         if (col.boxes.length === 0) return;
@@ -148,10 +222,10 @@ export function calculatePointAndFigure(ohlcData: OHLCData[]): OHLCData[] {
         const openVal = col.isUp ? lowBox * boxSize : highBox * boxSize;
         const closeVal = col.isUp ? highBox * boxSize : lowBox * boxSize;
         
-        const candleTime = baseTime + idx * 86400; // Sequence daily intervals
+        const candleTimeNum = baseTimeNum + idx * timeInterval;
         
         pfCandles.push({
-            time: candleTime,
+            time: formatTime(candleTimeNum, ohlcData[0].time),
             open: parseFloat(openVal.toFixed(2)),
             high: parseFloat((highBox * boxSize).toFixed(2)),
             low: parseFloat((lowBox * boxSize).toFixed(2)),
@@ -237,6 +311,7 @@ export const StockChart = ({
     // Series Refs
     const mainSeriesRef = useRef<ISeriesApi<"Candlestick" | "Line" | "Area" | "Bar" | "Baseline"> | null>(null);
     const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+    const lastChartTypeRef = useRef<string>('');
 
     // Indicators Series Map
     const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(new Map());
@@ -481,21 +556,21 @@ export const StockChart = ({
                 seriesOptions = {
                     upColor: colors.success.DEFAULT, downColor: colors.danger.DEFAULT,
                     borderUpColor: colors.success.DEFAULT, borderDownColor: colors.danger.DEFAULT,
-                    wickUpColor: colors.success.DEFAULT, wickDownColor: colors.danger.DEFAULT
+                    wickUpColor: colors.success.DEFAULT, wickDownColor: colors.danger.DEFAULT,
+                    wickVisible: false,   // HIDE WICKS FOR RENKO / P&F SOLID BRICKS
+                    borderVisible: false  // HIDE BORDERS FOR diagonal alignment
                 };
                 break;
         }
 
-        const expectedType = (chartType === 'candlestick' || chartType === 'renko' || chartType === 'pointAndFigure')
-            ? 'Candlestick'
-            : (chartType.charAt(0).toUpperCase() + chartType.slice(1));
-        const currentSeriesType = mainSeriesRef.current?.seriesType();
+        const chartTypeChanged = lastChartTypeRef.current !== chartType;
 
-        if (!mainSeriesRef.current || currentSeriesType !== expectedType) {
+        if (!mainSeriesRef.current || chartTypeChanged) {
             if (mainSeriesRef.current) {
                 mainChartRef.current.removeSeries(mainSeriesRef.current);
             }
             mainSeriesRef.current = mainChartRef.current.addSeries(seriesConstructor, seriesOptions);
+            lastChartTypeRef.current = chartType;
 
             // Add dotted baseline indicator line
             if (chartType === 'baseline') {
@@ -511,14 +586,14 @@ export const StockChart = ({
             }
         }
 
-        if (mainSeriesRef.current) {
-            let dataToSet = ohlcData;
-            if (chartType === 'renko') {
-                dataToSet = calculateRenko(ohlcData);
-            } else if (chartType === 'pointAndFigure') {
-                dataToSet = calculatePointAndFigure(ohlcData);
-            }
+        let dataToSet = ohlcData;
+        if (chartType === 'renko') {
+            dataToSet = calculateRenko(ohlcData);
+        } else if (chartType === 'pointAndFigure') {
+            dataToSet = calculatePointAndFigure(ohlcData);
+        }
 
+        if (mainSeriesRef.current) {
             if (chartType === 'candlestick' || chartType === 'bar' || chartType === 'renko' || chartType === 'pointAndFigure') {
                 mainSeriesRef.current.setData(dataToSet.map(d => ({ ...d, time: d.time as Time })));
             } else {
@@ -535,10 +610,10 @@ export const StockChart = ({
                     else if (timeframe === '3M') count = 90; // 3 months of daily candles
                     else if (timeframe === '1Y') count = 52; // 1 year of weekly candles
 
-                    if (count > 0 && ohlcData.length > count) {
+                    if (count > 0 && dataToSet.length > count) {
                         timeScale.setVisibleLogicalRange({
-                            from: ohlcData.length - count,
-                            to: ohlcData.length - 1
+                            from: dataToSet.length - count,
+                            to: dataToSet.length - 1
                         });
                     } else {
                         timeScale.fitContent();
@@ -552,11 +627,10 @@ export const StockChart = ({
         if (volumeSeriesRef.current) {
             let activeVolumeData = volumeData;
             if (chartType === 'renko') {
-                const renko = calculateRenko(ohlcData);
                 const rawVolMap = new Map<number, number>();
                 volumeData.forEach(v => rawVolMap.set(v.time as number, v.value));
                 
-                activeVolumeData = renko.map(r => {
+                activeVolumeData = dataToSet.map(r => {
                     const rawVol = rawVolMap.get(r.time as number) || 100000;
                     return {
                         time: r.time,
@@ -565,8 +639,7 @@ export const StockChart = ({
                     };
                 });
             } else if (chartType === 'pointAndFigure') {
-                const pf = calculatePointAndFigure(ohlcData);
-                activeVolumeData = pf.map(r => ({
+                activeVolumeData = dataToSet.map(r => ({
                     time: r.time,
                     value: 100000,
                     color: r.close >= r.open ? '#00d09c40' : '#eb5b3c40'
@@ -581,15 +654,19 @@ export const StockChart = ({
         }
 
         // C. Indicators
+        const isStandardChart = chartType !== 'renko' && chartType !== 'pointAndFigure';
+
         // Helper to manage series map
         const updateSeries = (key: string, data: any[] | undefined, type: 'Line' | 'Histogram', options: Record<string, unknown>, chart: IChartApi | null) => {
             if (!chart) return;
 
             let series = indicatorSeriesRef.current.get(key);
-            const isActive = activeIndicators.includes(key.split('_')[0]) || // e.g., 'SMA20'
+            const isActive = isStandardChart && (
+                activeIndicators.includes(key.split('_')[0]) || // e.g., 'SMA20'
                 (key.startsWith('BB_') && activeIndicators.includes('BB')) ||
                 (key.startsWith('RSI_') && activeIndicators.includes('RSI')) ||
-                (key.startsWith('MACD_') && activeIndicators.includes('MACD'));
+                (key.startsWith('MACD_') && activeIndicators.includes('MACD'))
+            );
 
             if (isActive && data && data.length > 0) {
                 if (!series) {
@@ -611,7 +688,7 @@ export const StockChart = ({
         updateSeries('EMA26', indicators.ema26, 'Line', { color: '#f44336', lineWidth: 1, title: 'EMA 26' }, mainChartRef.current);
 
         // Bollinger Bands
-        if (activeIndicators.includes('BB') && indicators.bollinger?.length && mainChartRef.current) {
+        if (isStandardChart && activeIndicators.includes('BB') && indicators.bollinger?.length && mainChartRef.current) {
             updateSeries('BB_UP', indicators.bollinger.map((b: BollingerBandsData) => ({ time: b.time, value: b.upper })), 'Line', { color: '#2962ff', lineWidth: 1, title: 'BB Upper' }, mainChartRef.current);
             updateSeries('BB_MID', indicators.bollinger.map((b: BollingerBandsData) => ({ time: b.time, value: b.middle })), 'Line', { color: '#2962ff', lineWidth: 1, lineStyle: 2, title: 'BB Basis' }, mainChartRef.current);
             updateSeries('BB_LO', indicators.bollinger.map((b: BollingerBandsData) => ({ time: b.time, value: b.lower })), 'Line', { color: '#2962ff', lineWidth: 1, title: 'BB Lower' }, mainChartRef.current);
@@ -680,12 +757,14 @@ export const StockChart = ({
                     ...liveCandle,
                     time: liveCandle.time as Time
                 });
-            } else {
+            } else if (chartType === 'line' || chartType === 'area' || chartType === 'baseline') {
                 mainSeriesRef.current.update({
                     time: liveCandle.time as Time,
                     value: liveCandle.close
                 });
             }
+            // Offline/sequential brick charts like Renko & Point and Figure are fully constructed
+            // and updated via the history calculation when ohlcData closes, avoiding scale & mismatch errors.
         }
     }, [liveCandle, chartType]);
 

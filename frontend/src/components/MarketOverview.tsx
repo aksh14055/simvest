@@ -31,8 +31,8 @@ export const MarketOverview = ({ stocks, isLoading = false, onStockClick }: Mark
             .sort((a, b) => b.avgChange - a.avgChange);
     }, [stocks, isLoading]);
 
-    const topGainers = useMemo(() => isLoading ? [] : [...stocks].sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0)).slice(0, 5), [stocks, isLoading]);
-    const topLosers = useMemo(() => isLoading ? [] : [...stocks].sort((a, b) => (a.changePercent || 0) - (b.changePercent || 0)).slice(0, 5), [stocks, isLoading]);
+    const topGainers = useMemo(() => isLoading ? [] : [...stocks].sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0)).slice(0, 8), [stocks, isLoading]);
+    const topLosers = useMemo(() => isLoading ? [] : [...stocks].sort((a, b) => (a.changePercent || 0) - (b.changePercent || 0)).slice(0, 8), [stocks, isLoading]);
 
     if (isLoading) {
         return (
@@ -54,11 +54,21 @@ export const MarketOverview = ({ stocks, isLoading = false, onStockClick }: Mark
                                 <Skeleton height={20} />
                                 <Skeleton height={20} />
                                 <Skeleton height={20} />
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
                             </div>
                         </div>
                         <div>
                             <Skeleton width={80} height={16} className="mb-2" />
                             <div className="space-y-2">
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
+                                <Skeleton height={20} />
                                 <Skeleton height={20} />
                                 <Skeleton height={20} />
                                 <Skeleton height={20} />

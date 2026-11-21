@@ -29,14 +29,18 @@ export default {
                     DEFAULT: '#059669', // Emerald
                 },
                 background: {
-                    DEFAULT: '#F9FAFB', // Light mode app background
+                    DEFAULT: 'var(--bg-primary)', // Dynamically mapped app background
                     light: '#FFFFFF', // White
                 },
                 surface: {
-                    DEFAULT: '#FFFFFF', // Light mode card background
-                    hover: '#F3F4F6', // Light mode hover
-                    border: '#E5E7EB', // Light mode border
+                    DEFAULT: 'var(--bg-secondary)', // Dynamically mapped card background
+                    hover: 'var(--bg-hover)', // Dynamically mapped hover background
+                    border: 'var(--border)', // Dynamically mapped border
                 },
+                card: 'var(--bg-secondary)', // Semantic card background
+                muted: 'var(--bg-hover)', // Semantic muted background
+                foreground: 'var(--text-primary)', // Semantic primary text
+                'muted-foreground': 'var(--text-secondary)', // Semantic secondary text
                 success: {
                     DEFAULT: '#059669', // Emerald-600
                     glow: 'rgba(5, 150, 105, 0.2)',
@@ -56,12 +60,12 @@ export default {
                     dark: '#B91C1C',
                 },
                 text: {
-                    primary: '#111827', // Light mode primary text
-                    secondary: '#4B5563', // Light mode secondary text
-                    muted: '#9CA3AF', // Light mode muted text
+                    primary: 'var(--text-primary)', // Dynamically mapped primary text
+                    secondary: 'var(--text-secondary)', // Dynamically mapped secondary text
+                    muted: 'var(--text-muted)', // Dynamically mapped muted text
                 },
                 border: {
-                    DEFAULT: '#E5E7EB', // Light mode border
+                    DEFAULT: 'var(--border)', // Dynamically mapped border
                 },
                 // Dark mode colors
                 dark: {

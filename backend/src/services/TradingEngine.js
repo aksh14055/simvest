@@ -674,6 +674,27 @@ class TradingEngine {
             throw error;
         }
     }
+
+    /**
+     * Update order strategy and notes (post-trade journaling)
+     */
+    async updateOrderMetadata(userId, orderId, { strategy, notes }) {
+        try {
+            const { data, error } = await supabase
+                .from('orders')
+                .update({ strategy, notes })
+                .eq('id', orderId)
+                .eq('user_id', userId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return { success: true, order: data };
+        } catch (error) {
+            console.error('❌ Update order metadata error:', error.message);
+            throw error;
+        }
+    }
 }
 
 export default TradingEngine;

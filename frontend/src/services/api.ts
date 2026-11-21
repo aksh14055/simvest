@@ -77,6 +77,14 @@ export const apiService = {
         return response.data;
     },
 
+    async updateOrderMetadata(orderId: string, strategy: string, notes: string) {
+        const response = await api.put(`/api/trade/orders/${orderId}/metadata`, {
+            strategy,
+            notes
+        });
+        return response.data;
+    },
+
     async getPortfolio() {
         const response = await api.get('/api/trade/portfolio');
         const data = response.data.portfolio;
