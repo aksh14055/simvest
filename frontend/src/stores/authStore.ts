@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { authService } from '../services/supabase';
 import type { User } from '../types';
+import type { Session } from '@supabase/supabase-js';
 
 // ─── Security Helper ──────────────────────────────────────────────────────────
 // Supabase returns raw internal error strings that can enable user enumeration.
@@ -43,6 +44,7 @@ interface AuthState {
     signOut: () => Promise<void>;
     checkAuth: () => Promise<void>;
     clearError: () => void;
+    applySession: (session: Session | null) => void;
     updateProfile: (data: Record<string, any>) => Promise<void>;
 }
 
@@ -117,10 +119,21 @@ export const useAuthStore = create<AuthState>((set) => ({
                 set({ user: null, isAuthenticated: false, isLoading: false });
             }
         } catch {
-            // Network failure — treat as unauthenticated, don't surface error message
-            set({ user: null, isAuthenticated: false, isLoading: false });
+            // A temporary session-read failure must not clear an existing user.
+            set({ isLoading: false, error: 'Unable to check your session. Please retry.' });
         }
     },
+
+    applySession: (session) => set({
+        user: session?.user ? {
+            ...(session.user.user_metadata || {}),
+            id: session.user.id,
+            email: session.user.email!
+        } as User : null,
+        isAuthenticated: !!session?.user && !!session?.access_token,
+        isLoading: false,
+        error: null,
+    }),
 
     clearError: () => set({ error: null }),
 

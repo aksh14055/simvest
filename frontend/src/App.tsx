@@ -16,6 +16,7 @@ import { LandingPage } from './pages/LandingPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { UpstoxCallbackPage } from './pages/UpstoxCallbackPage';
 import { useAuthStore } from './stores/authStore';
+import { supabase } from './services/supabase';
 import { useThemeStore } from './stores/themeStore';
 import { useMarketStore } from './stores/marketStore';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -24,12 +25,17 @@ import { PublicRoute } from './components/PublicRoute';
 import { Toaster } from 'react-hot-toast';
 
 const App = () => {
-    const { checkAuth } = useAuthStore();
+    const { applySession } = useAuthStore();
     const { theme, setTheme } = useThemeStore();
 
     useEffect(() => {
-        checkAuth();
-    }, [checkAuth]);
+        // Keep the store in sync with SDK refreshes, sign-ins and genuine sign-outs.
+        // This callback stays synchronous and never calls back into Supabase.
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            applySession(session);
+        });
+        return () => subscription.unsubscribe();
+    }, [applySession]);
 
     const { connectWebSocket, disconnectWebSocket } = useMarketStore();
 

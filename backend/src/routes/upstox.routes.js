@@ -65,7 +65,7 @@ router.post('/quotes', async (req, res) => {
         const { instrumentKeys } = req.body;
 
         if (!upstoxService.isAdminConnected()) {
-            return res.status(401).json({
+            return res.status(503).json({
                 success: false,
                 message: 'Admin not connected to Upstox. Please connect first.'
             });
@@ -93,7 +93,7 @@ router.get('/historical/:instrumentKey/:interval/:toDate', async (req, res) => {
         const { instrumentKey, interval, toDate } = req.params;
 
         if (!upstoxService.isAdminConnected()) {
-            return res.status(401).json({
+            return res.status(503).json({
                 success: false,
                 message: 'Admin not connected to Upstox'
             });

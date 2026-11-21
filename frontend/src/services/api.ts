@@ -27,26 +27,17 @@ api.interceptors.request.use(async (config) => {
 });
 
 // ─── RESPONSE INTERCEPTOR ─────────────────────────────────────────────────────
-// Catches session expiry (401) and rate limiting (429) globally so individual
-// API calls don't need their own handling for these infrastructure-level errors.
+// API failures must not destroy the independently managed Supabase session.
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const status = error.response?.status;
 
         if (status === 401) {
-            // Session expired — sign out cleanly and redirect to login
-            await supabase.auth.signOut();
-            localStorage.removeItem('supabase.auth.token');
-
-            // Lazy-import toast to avoid a circular dependency at module init time
             const { default: toast } = await import('react-hot-toast');
-            toast.error('Your session has expired. Please sign in again.', { duration: 5000 });
-
-            // Redirect after a brief moment so the toast is visible
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 1500);
+            toast.error('The server could not authorize this request. Please retry.', {
+                id: 'api-authorization-error', duration: 5000
+            });
         } else if (status === 429) {
             const { default: toast } = await import('react-hot-toast');
             toast.error('Too many requests. Please wait a moment before trying again.', { duration: 6000 });

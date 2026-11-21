@@ -3,7 +3,8 @@ import { supabaseAnon } from '../config/supabase.config.js';
 /**
  * Middleware to verify Supabase JWT token
  */
-export default async function authenticateUser(req, res, next) {
+export function createAuthenticateUser(client = supabaseAnon) {
+return async function authenticateUser(req, res, next) {
     try {
         const authHeader = req.headers.authorization;
 
@@ -19,7 +20,7 @@ export default async function authenticateUser(req, res, next) {
 
         while (retries > 0) {
             try {
-                const { data: { user }, error } = await supabaseAnon.auth.getUser(token);
+                const { data: { user }, error } = await client.auth.getUser(token);
 
                 if (error) {
                     if (error.message?.includes('timeout') || error.code === 'UND_ERR_CONNECT_TIMEOUT') {
@@ -29,7 +30,11 @@ export default async function authenticateUser(req, res, next) {
                         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
                         continue;
                     }
-                    return res.status(401).json({ error: 'Invalid token' });
+                    if (error.status === 401 || error.status === 403 ||
+                        ['bad_jwt', 'session_not_found', 'session_expired', 'user_not_found'].includes(error.code)) {
+                        return res.status(401).json({ error: 'Invalid token' });
+                    }
+                    return res.status(503).json({ error: 'Authentication service temporarily unavailable' });
                 }
 
                 if (!user) {
@@ -61,6 +66,10 @@ export default async function authenticateUser(req, res, next) {
 
     } catch (error) {
         console.error('Authentication error:', error);
-        res.status(401).json({ error: 'Authentication failed' });
+        res.status(503).json({ error: 'Authentication service temporarily unavailable' });
     }
 }
+
+}
+
+export default createAuthenticateUser();

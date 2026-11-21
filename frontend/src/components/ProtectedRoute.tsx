@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
@@ -7,14 +6,8 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-    const { isAuthenticated, isLoading, checkAuth, user } = useAuthStore();
+    const { isAuthenticated, isLoading, user } = useAuthStore();
     const location = useLocation();
-
-    useEffect(() => {
-        if (!isAuthenticated && !isLoading) {
-            checkAuth();
-        }
-    }, [isAuthenticated, isLoading, checkAuth]);
 
     if (isLoading) {
         return (
