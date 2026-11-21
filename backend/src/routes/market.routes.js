@@ -137,7 +137,8 @@ router.get('/indices', async (req, res) => {
         res.json({ indices });
     } catch (error) {
         console.error('Indices fetch error:', error);
-        res.status(500).json({ error: error.message });
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 });
 
@@ -199,7 +200,8 @@ router.get('/instruments', async (req, res) => {
         res.json({ instruments });
     } catch (error) {
         console.error('Instruments fetch error:', error);
-        res.status(500).json({ error: error.message });
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 });
 
@@ -222,7 +224,8 @@ router.get('/historical/:instrumentKey', async (req, res) => {
         res.json({ candles });
     } catch (error) {
         console.error('Historical data fetch error:', error);
-        res.status(500).json({ error: error.message });
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 });
 
@@ -237,7 +240,8 @@ router.get('/signals', async (req, res) => {
         res.json({ signals });
     } catch (error) {
         console.error('Signals fetch error:', error);
-        res.status(500).json({ error: error.message });
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({ error: error.message });
     }
 });
 

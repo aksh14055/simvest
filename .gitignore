@@ -67,3 +67,6 @@ ENV/
 .turbo
 .vercel
 .netlify
+
+# Private database recovery artifacts
+/recovery/

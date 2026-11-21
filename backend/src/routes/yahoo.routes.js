@@ -16,7 +16,8 @@ router.get('/quote/:symbol', async (req, res) => {
             data: quote
         });
     } catch (error) {
-        res.status(500).json({
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({
             success: false,
             message: error.message
         });
@@ -44,7 +45,8 @@ router.post('/quotes', async (req, res) => {
             data: quotes
         });
     } catch (error) {
-        res.status(500).json({
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({
             success: false,
             message: error.message
         });
@@ -66,7 +68,8 @@ router.get('/historical/:symbol', async (req, res) => {
             data
         });
     } catch (error) {
-        res.status(500).json({
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({
             success: false,
             message: error.message
         });
@@ -94,7 +97,8 @@ router.get('/search', async (req, res) => {
             data: results
         });
     } catch (error) {
-        res.status(500).json({
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({
             success: false,
             message: error.message
         });
@@ -114,7 +118,8 @@ router.get('/profile/:symbol', async (req, res) => {
             data: profile
         });
     } catch (error) {
-        res.status(500).json({
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({
             success: false,
             message: error.message
         });
@@ -134,7 +139,8 @@ router.get('/news/:symbol', async (req, res) => {
             data: news
         });
     } catch (error) {
-        res.status(500).json({
+        if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+        res.status(error.statusCode || 500).json({
             success: false,
             message: error.message
         });

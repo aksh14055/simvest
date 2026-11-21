@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import WebSocket from 'ws';
 import { getAllInstrumentKeys, getSymbolFromKey } from '../config/nifty50.config.js';
 import yahooFinanceService from './YahooFinanceService.js';
 
@@ -17,42 +16,12 @@ class MarketDataService extends EventEmitter {
         this.previousCloses = new Map(); // Store previous close for day change calculation
         this.isRunning = false;
         this.lastFetchTime = 0;
-        this.fetchInterval = 5000; // Fetch from Yahoo every 5 seconds as requested
+        this.fetchInterval = 60000; // Share the one-minute REST quote cache.
+        this.fetchedAt = new Map();
+        this.fetching = false;
     }
 
 
-
-    /**
-     * Get realistic base price for a symbol (fallback)
-     */
-    getBasePriceForSymbol(symbol) {
-        // Realistic price ranges for major NIFTY 50 stocks
-        const priceRanges = {
-            'RELIANCE': 2500,
-            'TCS': 3500,
-            'HDFCBANK': 1600,
-            'INFY': 1400,
-            'ICICIBANK': 950,
-            'HINDUNILVR': 2400,
-            'ITC': 420,
-            'SBIN': 580,
-            'BHARTIARTL': 850,
-            'KOTAKBANK': 1750,
-            'LT': 3200,
-            'AXISBANK': 1050,
-            'ASIANPAINT': 2900,
-            'MARUTI': 10500,
-            'SUNPHARMA': 1450,
-            'TITAN': 3100,
-            'ULTRACEMCO': 8500,
-            'BAJFINANCE': 6500,
-            'NESTLEIND': 2200,
-            'WIPRO': 450,
-            'TATASTEEL': 145
-        };
-
-        return priceRanges[symbol] || (Math.random() * 2000 + 500);
-    }
 
     /**
      * Fetch fresh prices from Yahoo Finance
@@ -61,11 +30,12 @@ class MarketDataService extends EventEmitter {
         const now = Date.now();
 
         // Only fetch if enough time has passed
-        if (now - this.lastFetchTime < this.fetchInterval) {
+        if (this.fetching || now - this.lastFetchTime < this.fetchInterval) {
             return;
         }
 
         this.lastFetchTime = now;
+        this.fetching = true;
         const instrumentKeys = getAllInstrumentKeys();
         const symbols = instrumentKeys.map(key => getSymbolFromKey(key));
 
@@ -75,9 +45,10 @@ class MarketDataService extends EventEmitter {
             quotes.forEach((quote, index) => {
                 const instrumentKey = instrumentKeys[index];
 
-                // Only update if we got a valid price to avoid overwriting fallbacks with 0
+                // Missing quotes must not overwrite genuine prices.
                 if (quote.price && quote.price > 0) {
                     this.mockPrices.set(instrumentKey, quote.price);
+                    this.fetchedAt.set(instrumentKey, Date.now());
                 }
 
                 // Always update previous close with real data from Yahoo
@@ -98,24 +69,13 @@ class MarketDataService extends EventEmitter {
             } else {
                 console.error('⚠️  Error fetching Yahoo prices:', error.message);
             }
-            // Keep using cached prices
+            // Do not fabricate prices when the provider is unavailable.
+        } finally {
+            this.fetching = false;
         }
     }
 
-    /**
-     * Generate realistic price movement (small fluctuations between Yahoo updates)
-     */
-    /**
-     * Get current price for instrument (no simulation)
-     */
-    generatePriceUpdate(instrumentKey) {
-        // Return exact price from Yahoo Finance without simulation
-        return this.mockPrices.get(instrumentKey) || 0;
-    }
-
-    /**
-     * Start mock data generation
-     */
+    /** Start the Yahoo polling service. */
     async start() {
         if (this.isRunning) {
             console.log('⚠️  Mock service already running');
@@ -124,31 +84,16 @@ class MarketDataService extends EventEmitter {
 
         console.log('🚀 Starting Live Market Data Service (Yahoo Finance)...');
 
-        // Initialize with base prices IMMEDIATELY to prevent empty cache race conditions
-        const instrumentKeys = getAllInstrumentKeys();
-        instrumentKeys.forEach(instrumentKey => {
-            const symbol = getSymbolFromKey(instrumentKey);
-            const basePrice = this.getBasePriceForSymbol(symbol);
-            this.mockPrices.set(instrumentKey, basePrice);
-            this.previousCloses.set(instrumentKey, basePrice); // Initialize prev close too
-        });
-        console.log(`✅ Pre-initialized ${this.mockPrices.size} instruments with base prices`);
-
-        // Now update with real data asynchronously
-        this.fetchRealPrices().catch(err => console.error("Initial fetch failed:", err.message));
-
         this.isRunning = true;
+        this.fetchRealPrices().then(() => {
+            if (this.isRunning) this.broadcastPriceUpdates();
+        }).catch(err => console.error("Initial fetch failed:", err.message));
 
-        // Broadcast price updates when data is fetched (or slightly more often if needed)
-        // Since we removed simulation, we can sync this with fetch, or keep it 1s to ensure UI stays responsive
-        // but sends same price until new fetch.
-        // Let's keep 1s broadcast but only fetch every 5s.
-        // Fetch and broadcast every 5 seconds
-        // (Yahoo Finance free tier usually updates delayed or on 1-5m interval, but we poll every 5s for best latency)
+        // Quotes are fetched once a minute; failed requests respect the shared cooldown.
         this.updateInterval = setInterval(async () => {
             await this.fetchRealPrices();
             this.broadcastPriceUpdates();
-        }, 5000);
+        }, this.fetchInterval);
 
         console.log('✅ Live Market Data Service started');
         console.log('📡 Broadcasting real-time price updates');
@@ -164,7 +109,8 @@ class MarketDataService extends EventEmitter {
         instrumentKeys.forEach(instrumentKey => {
             const symbol = getSymbolFromKey(instrumentKey);
             // Get latest price (exact match from Yahoo)
-            const ltp = this.generatePriceUpdate(instrumentKey);
+            const ltp = this.getCachedPrice(instrumentKey);
+            if (!(ltp > 0)) return;
             const timestamp = this.mockPrices.get(`${instrumentKey}_time`) || Date.now();
 
             const prevClose = this.previousCloses.get(instrumentKey) || ltp;
@@ -193,9 +139,11 @@ class MarketDataService extends EventEmitter {
     }
 
     /**
-     * Get current mock price for an instrument
+     * Get a recently fetched provider price for trading
      */
     getCachedPrice(instrumentKey) {
+        const fetchedAt = this.fetchedAt.get(instrumentKey);
+        if (!fetchedAt || Date.now() - fetchedAt >= this.fetchInterval) return undefined;
         return this.mockPrices.get(instrumentKey);
     }
 

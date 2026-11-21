@@ -16,7 +16,7 @@ import { Footer } from '../components/Footer';
 
 
 export const DashboardPage = () => {
-    const { stocks, fetchInstruments, prices, isLoading: isMarketLoading } = useMarketStore();
+    const { stocks, fetchInstruments, prices, error: marketError, isLoading: isMarketLoading } = useMarketStore();
     const { portfolio, orders, fetchPortfolio, fetchOrders, updatePortfolioWithPrices } = usePortfolioStore();
     const { checkStatus: checkUpstoxStatus } = useUpstoxStore();
     const [searchTerm, setSearchTerm] = useState('');
@@ -45,6 +45,15 @@ export const DashboardPage = () => {
                     onSearchChange={setSearchTerm}
                 />
             </div>
+
+            {marketError && (
+                <div role="alert" className="flex-none bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100 px-4 py-3">
+                    Market data unavailable: {marketError}
+                    <button type="button" className="ml-3 underline" onClick={() => fetchInstruments()} disabled={isMarketLoading}>
+                        {isMarketLoading ? 'Retrying...' : 'Retry'}
+                    </button>
+                </div>
+            )}
 
             {/* Status Bar (Portfolio Metrics) */}
             <div className="flex-none">

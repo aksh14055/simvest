@@ -53,7 +53,7 @@ export const useMarketStore = create<MarketState>((set, get) => ({
             set({ stocks, isLoading: false });
         } catch (error: any) {
             set({
-                error: error.message || 'Failed to fetch instruments',
+                error: error.response?.data?.error || error.message || 'Failed to fetch instruments',
                 isLoading: false,
             });
         }
